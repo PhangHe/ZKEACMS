@@ -8,45 +8,52 @@
 
 using Easy;
 using Easy.Extend;
+using Easy.Mvc.Authorize;
+using Easy.Mvc.DataAnnotations;
+using Easy.Mvc.Plugin;
+using Easy.Mvc.Resource;
 using Easy.RepositoryPattern;
+using Easy.StartTask;
+using Easy.Storage;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ApplicationParts;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.DependencyModel;
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using ZKEACMS.Account;
+using ZKEACMS.Article.Models;
+using ZKEACMS.Common.Models;
 using ZKEACMS.Common.Service;
 using ZKEACMS.Dashboard;
 using ZKEACMS.DataArchived;
+using ZKEACMS.DbConnectionPool;
 using ZKEACMS.ExtendField;
 using ZKEACMS.Layout;
 using ZKEACMS.Media;
+using ZKEACMS.ModelBinder;
+using ZKEACMS.Notification;
+using ZKEACMS.Options;
+using ZKEACMS.PackageManger;
 using ZKEACMS.Page;
+using ZKEACMS.Product.Models;
+using ZKEACMS.Route;
 using ZKEACMS.Setting;
+using ZKEACMS.SMTP;
 using ZKEACMS.Theme;
 using ZKEACMS.Widget;
 using ZKEACMS.WidgetTemplate;
 using ZKEACMS.Zone;
-using ZKEACMS.PackageManger;
-using ZKEACMS.Options;
-using Microsoft.Extensions.Configuration;
-using ZKEACMS.Notification;
-using ZKEACMS.Account;
-using Easy.Mvc.Plugin;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
-using ZKEACMS.ModelBinder;
-using Easy.Mvc.DataAnnotations;
-using Microsoft.AspNetCore.Authorization;
-using Easy.Mvc.Authorize;
-using ZKEACMS.Route;
-using Microsoft.AspNetCore.Http;
-using System.Linq;
-using ZKEACMS.Article.Models;
-using ZKEACMS.Common.Models;
-using ZKEACMS.Product.Models;
-using System;
-using Easy.Mvc.Resource;
-using CacheManager.Core;
-using System.Collections.Generic;
-using Microsoft.AspNetCore.Mvc;
-using Easy.StartTask;
 
 namespace ZKEACMS
 {
@@ -55,14 +62,15 @@ namespace ZKEACMS
         public static void UseZKEACMS(this IServiceCollection services, IConfiguration configuration)
         {
 
-            services.AddMvc(option =>
-            {
-                option.ModelBinderProviders.Insert(0, new WidgetTypeModelBinderProvider());
-                option.ModelMetadataDetailsProviders.Add(new DataAnnotationsMetadataProvider());
-            })
+            IMvcBuilder mvcBuilder = services.AddMvc(option =>
+             {
+                 option.ModelBinderProviders.Insert(0, new WidgetTypeModelBinderProvider());
+                 option.ModelMetadataDetailsProviders.Add(new DataAnnotationsMetadataProvider());
+                 //option.EnableEndpointRouting = false;
+             })
             .AddControllersAsServices()
             .AddJsonOptions(option => { option.SerializerSettings.DateFormatString = "yyyy-MM-dd"; })
-            .SetCompatibilityVersion(CompatibilityVersion.Version_2_1);
+            .SetCompatibilityVersion(CompatibilityVersion.Latest);
 
             services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();
 
@@ -70,13 +78,13 @@ namespace ZKEACMS
             services.TryAddScoped<IApplicationContext, CMSApplicationContext>();
             services.TryAddSingleton<IRouteProvider, RouteProvider>();
 
-            services.AddSingleton<IRouteDataProvider, PaginationRouteDataProvider>();
-            services.AddSingleton<IRouteDataProvider, PostIdRouteDataProvider>();
-            services.AddSingleton<IRouteDataProvider, CategoryRouteDataProvider>();
-            services.AddSingleton<IRouteDataProvider, HtmlRouteDataProvider>();
+            services.AddTransient<IRouteDataProvider, PaginationRouteDataProvider>();
+            services.AddTransient<IRouteDataProvider, PostIdRouteDataProvider>();
+            services.AddTransient<IRouteDataProvider, CategoryRouteDataProvider>();
+            services.AddTransient<IRouteDataProvider, HtmlRouteDataProvider>();
 
             services.TryAddSingleton<IAdminMenuProvider, AdminMenuProvider>();
-            services.TryAddTransient<IWidgetActivator, DefaultWidgetActivator>();
+            services.TryAddScoped<IWidgetActivator, DefaultWidgetActivator>();
             services.TryAddTransient<ICarouselItemService, CarouselItemService>();
             services.TryAddTransient<ICarouselService, CarouselService>();
             services.TryAddTransient<INavigationService, NavigationService>();
@@ -89,15 +97,16 @@ namespace ZKEACMS
             services.TryAddTransient<IExtendFieldService, ExtendFieldService>();
             services.TryAddTransient<INotifyService, NotifyService>();
             services.AddTransient<IUserCenterLinksProvider, UserCenterLinksProvider>();
-            services.TryAddTransient<ILayoutService, LayoutService>();
-            services.TryAddTransient<ILayoutHtmlService, LayoutHtmlService>();
+            services.AddTransient<IUserCenterLinkService, UserCenterLinkService>();
+            services.TryAddScoped<ILayoutService, LayoutService>();
+            services.TryAddScoped<ILayoutHtmlService, LayoutHtmlService>();
             services.TryAddTransient<IMediaService, MediaService>();
-            services.TryAddTransient<IPageService, PageService>();
-            services.TryAddTransient<IApplicationSettingService, ApplicationSettingService>();
-            services.TryAddTransient<IThemeService, ThemeService>();
+            services.TryAddScoped<IPageService, PageService>();
+            services.TryAddScoped<IApplicationSettingService, ApplicationSettingService>();
+            services.TryAddScoped<IThemeService, ThemeService>();
             services.TryAddTransient<IWidgetTemplateService, WidgetTemplateService>();
-            services.TryAddTransient<IWidgetBasePartService, WidgetBasePartService>();
-            services.TryAddTransient<IZoneService, ZoneService>();
+            services.TryAddScoped<IWidgetBasePartService, WidgetBasePartService>();
+            services.TryAddScoped<IZoneService, ZoneService>();
             services.TryAddTransient<Rule.IRuleService, Rule.RuleService>();
 
             services.AddScoped<IOnModelCreating, EntityFrameWorkModelCreating>();
@@ -110,18 +119,12 @@ namespace ZKEACMS
             services.AddTransient<IPackageInstallerProvider, PackageInstallerProvider>();
             services.AddTransient<IEventViewerService, EventViewerService>();
 
-            services.AddSingleton(serviceProvider => CacheFactory.Build<IEnumerable<WidgetBase>>(setting =>
-            {
-                setting.WithDictionaryHandle("PageWidgets");
-            }));
-            services.AddSingleton(serviceProvider => CacheFactory.Build<IEnumerable<ZoneEntity>>(setting =>
-            {
-                setting.WithDictionaryHandle("PublishedPageZones");
-            }));
-            services.AddSingleton(serviceProvider => CacheFactory.Build<IEnumerable<LayoutHtml>>(setting =>
-            {
-                setting.WithDictionaryHandle("PublishedPageLayoutHtmls");
-            }));
+            services.AddTransient<IStorage, WebStorage>();
+
+            services.ConfigureCache<IEnumerable<WidgetBase>>();
+            services.ConfigureCache<IEnumerable<ZoneEntity>>();
+            services.ConfigureCache<IEnumerable<LayoutHtml>>();
+            services.ConfigureCache<ConcurrentDictionary<string, object>>();
 
             services.ConfigureMetaData<ArticleEntity, ArticleEntityMeta>();
             services.ConfigureMetaData<ArticleType, ArtycleTypeMetaData>();
@@ -149,6 +152,8 @@ namespace ZKEACMS
             services.ConfigureMetaData<ZoneEntity, ZoneEntityMetaData>();
             services.ConfigureMetaData<Rule.Rule, Rule.RuleMetaData>();
             services.ConfigureMetaData<Rule.RuleItem, Rule.RuleItemMetaData>();
+            services.ConfigureMetaData<SmtpSetting, SmtpSettingMetaData>();
+            services.ConfigureMetaData<Robots, RobotsMetaData>();
 
             services.Configure<NavigationWidget>(option =>
             {
@@ -161,21 +166,35 @@ namespace ZKEACMS
                 option.DataSourceLinkTitle = "焦点图";
                 option.DataSourceLink = "~/admin/Carousel";
             });
-
+            #region 数据库配置
+            services.AddSingleton<IDatabaseConfiguring, EntityFrameWorkConfigure>();
+            services.AddSingleton<IDbConnectionPool, SimpleDbConnectionPool>();
+            //池的配置：
+            //MaximumRetained规定池的容量（常态最大保有数量）。
+            //MaximumRetained为0时，相当于不使用DbConnection池，
+            //但因为在Request期间Connection是保持打开的，所以对许多场合还是有性能改善的。
+            services.AddSingleton(new DbConnectionPool.Options() { MaximumRetained = 128 });
+            //提供在Request期间租、还DbConnection的支持
+            services.AddScoped<IConnectionHolder, TransientConnectionHolder>();
+            services.AddDbContextOptions<CMSDbContext>();
             services.AddDbContext<CMSDbContext>();
-
-            services.Configure<DatabaseOption>(configuration.GetSection("Database"));
+            services.AddScoped<EasyDbContext>((provider) => provider.GetService<CMSDbContext>());
+            DatabaseOption databaseOption = configuration.GetSection("Database").Get<DatabaseOption>();
+            //DataTableAttribute.IsLowerCaseTableNames = databaseOption.DbType == DbTypes.MySql;
+            services.AddSingleton(databaseOption);
+            #endregion
 
             services.UseEasyFrameWork(configuration);
-            foreach (var item in services.LoadAvailablePlugins())
+            foreach (IPluginStartup item in services.LoadAvailablePlugins())
             {
-                item.Setup(services);
+                item.Setup(new object[] { services, mvcBuilder });
             }
-            foreach (var item in WidgetBase.KnownWidgetService)
+
+            foreach (KeyValuePair<string, Type> item in WidgetBase.KnownWidgetService)
             {
                 services.TryAddTransient(item.Value);
             }
-            foreach (var item in WidgetBase.KnownWidgetModel)
+            foreach (KeyValuePair<string, Type> item in WidgetBase.KnownWidgetModel)
             {
                 services.TryAddTransient(item.Value);
             }
@@ -216,10 +235,11 @@ namespace ZKEACMS
                     routes.MapRoute(route.RouteName, route.Template, route.Defaults, route.Constraints, route.DataTokens);
                 });
             });
-            foreach (var task in applicationBuilder.ApplicationServices.GetServices<IStartTask>())
+            foreach (IStartTask task in applicationBuilder.ApplicationServices.GetServices<IStartTask>())
             {
                 task.Excute();
             }
+            System.IO.Directory.SetCurrentDirectory(hostingEnvironment.ContentRootPath);
             Console.WriteLine("Welcome to use ZKEACMS");
         }
     }

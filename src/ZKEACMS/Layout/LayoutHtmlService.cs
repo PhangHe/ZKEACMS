@@ -7,18 +7,19 @@ using Easy;
 using Microsoft.EntityFrameworkCore;
 using System;
 using ZKEACMS.Page;
-using CacheManager.Core;
+using Easy.Cache;
+using Microsoft.AspNetCore.Http;
 
 namespace ZKEACMS.Layout
 {
-    public class LayoutHtmlService : ServiceBase<LayoutHtml>, ILayoutHtmlService
+    public class LayoutHtmlService : ServiceBase<LayoutHtml, CMSDbContext>, ILayoutHtmlService
     {
         private readonly ICacheManager<IEnumerable<LayoutHtml>> _cacheManager;
         public LayoutHtmlService(IApplicationContext applicationContext, ICacheManager<IEnumerable<LayoutHtml>> cacheManager, CMSDbContext dbContext) : base(applicationContext, dbContext)
         {
             _cacheManager = cacheManager;
         }
-        public override DbSet<LayoutHtml> CurrentDbSet => (DbContext as CMSDbContext).LayoutHtml;
+        public override DbSet<LayoutHtml> CurrentDbSet => DbContext.LayoutHtml;
 
         public override IQueryable<LayoutHtml> Get()
         {
@@ -31,7 +32,7 @@ namespace ZKEACMS.Layout
         }
         public IEnumerable<LayoutHtml> GetByPage(PageEntity page)
         {
-            Func<string, IEnumerable<LayoutHtml>> get = key =>
+            IEnumerable<LayoutHtml> get(string key, string regin)
             {
                 IEnumerable<LayoutHtml> html = Get().Where(m => m.PageId == page.ID).OrderBy(m => m.LayoutHtmlId).ToList();
                 if (!html.Any())
@@ -46,17 +47,26 @@ namespace ZKEACMS.Layout
                     }
                 }
                 return html;
-            };
+            }
             if (page.IsPublishedPage)
             {
-                return _cacheManager.GetOrAdd(page.ID, get);
+                return _cacheManager.GetOrAdd(page.ID, page.ReferencePageID, get);
             }
-            return get(page.ID);
+            return get(page.ID, page.ReferencePageID);
         }
         public IEnumerable<LayoutHtml> GetByLayoutID(string layoutId)
         {
             return Get().Where(m => m.LayoutId == layoutId && m.PageId == null).OrderBy(m => m.LayoutHtmlId).ToList();
         }
 
+        public void RemoveCache(string pageId)
+        {
+            _cacheManager.ClearRegion(pageId);
+        }
+
+        public void ClearCache()
+        {
+            _cacheManager.Clear();
+        }
     }
 }

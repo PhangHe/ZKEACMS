@@ -1,4 +1,7 @@
-﻿using Microsoft.AspNetCore.Mvc;
+/* http://www.zkea.net/ 
+ * Copyright (c) ZKEASOFT. All rights reserved. 
+ * http://www.zkea.net/licenses */
+using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -7,7 +10,7 @@ using ZKEACMS.Setting;
 
 namespace ZKEACMS.Controllers
 {
-    public abstract class SettingController<T> : Controller where T : new()
+    public abstract class SettingController<T> : Controller where T : class, new()
     {
         private readonly IApplicationSettingService _applicationSettingService;
         public SettingController(IApplicationSettingService applicationSettingService)
@@ -16,21 +19,20 @@ namespace ZKEACMS.Controllers
         }
         public virtual string Key { get { return typeof(T).FullName; } }
 
-        public IActionResult Edit()
+        public virtual IActionResult Config()
         {
-
-            return View(_applicationSettingService.Get<T>());
+            return View("GeneralSetting", _applicationSettingService.Get<T>());
         }
 
         [HttpPost]
-        public IActionResult Edit(T entity)
+        public virtual IActionResult Config(T entity)
         {
             if (ModelState.IsValid)
             {
                 _applicationSettingService.Save(entity);
-                return Redirect("Edit");
+                return Redirect("Config");
             }
-            return View(entity);
+            return View("GeneralSetting", entity);
         }
     }
 }

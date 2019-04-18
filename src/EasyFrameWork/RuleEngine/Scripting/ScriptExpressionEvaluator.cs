@@ -1,11 +1,11 @@
-﻿/* http://www.zkea.net/ 
+/* http://www.zkea.net/ 
  * Copyright 2018 ZKEASOFT 
  * http://www.zkea.net/licenses */
 
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using CacheManager.Core;
+using Easy.Cache;
 using Easy.RuleEngine.Scripting.Ast;
 using Easy.RuleEngine.Scripting.Compiler;
 

@@ -1,33 +1,65 @@
 /* http://www.zkea.net/ Copyright 2016 ZKEASOFT http://www.zkea.net/licenses */
 using System;
+using System.Collections.Concurrent;
+using System.Linq;
 using Easy;
+using Easy.Cache;
 using Easy.Constant;
 using Easy.Extend;
 using Easy.RepositoryPattern;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
+using ZKEACMS.DataArchived;
 
 namespace ZKEACMS.Setting
 {
-    public class ApplicationSettingService : ServiceBase<ApplicationSetting>, IApplicationSettingService
+    public class ApplicationSettingService : ServiceBase<ApplicationSetting, CMSDbContext>, IApplicationSettingService
     {
-        public ApplicationSettingService(IApplicationContext applicationContext, CMSDbContext dbContext) : base(applicationContext, dbContext)
+        private readonly IDataArchivedService _dataArchivedService;
+        private readonly ConcurrentDictionary<string, object> _settingCache;
+        private const string ApplicationSetting = "ApplicationSetting";
+        public ApplicationSettingService(IApplicationContext applicationContext,
+            IDataArchivedService dataArchivedService,
+            ICacheManager<ConcurrentDictionary<string, object>> cacheManager,
+            CMSDbContext dbContext) : base(applicationContext, dbContext)
         {
+            _dataArchivedService = dataArchivedService;
+            _settingCache = cacheManager.GetOrAdd(ApplicationSetting, new ConcurrentDictionary<string, object>());
         }
 
-        public override DbSet<ApplicationSetting> CurrentDbSet => (DbContext as CMSDbContext).ApplicationSetting;
+        public override DbSet<ApplicationSetting> CurrentDbSet => DbContext.ApplicationSetting;
+
+        public override IQueryable<ApplicationSetting> Get()
+        {
+            return CurrentDbSet.AsNoTracking();
+        }
 
         public override ServiceResult<ApplicationSetting> Add(ApplicationSetting item)
         {
             if (Count(m => m.SettingKey == item.SettingKey) == 0)
             {
+                _settingCache.TryAdd(item.SettingKey, item);
                 return base.Add(item);
             }
             var result = new ServiceResult<ApplicationSetting>();
-            result.RuleViolations.Add(new RuleViolation("SettingKey", "“—æ≠¥Ê‘⁄∏√º¸÷µ"));
+            result.RuleViolations.Add(new RuleViolation("SettingKey", "Â∑≤ÁªèÂ≠òÂú®ËØ•ÈîÆÂÄº"));
             return result;
         }
-
+        public override ApplicationSetting Get(params object[] primaryKey)
+        {
+            object value;
+            if (_settingCache.TryGetValue(primaryKey[0].ToString(), out value))
+            {
+                return value as ApplicationSetting;
+            }
+            var entity = base.Get(primaryKey);
+            if (entity != null)
+            {
+                DbContext.Attach(entity).State = EntityState.Detached;
+                _settingCache.TryAdd(entity.SettingKey, entity);
+            }
+            return null;
+        }
         public string Get(string settingKey, string defaultValue)
         {
             var setting = Get(settingKey);
@@ -46,40 +78,49 @@ namespace ZKEACMS.Setting
             return setting.Value;
         }
 
-        public T Get<T>() where T : new()
+        public override ServiceResult<ApplicationSetting> Update(ApplicationSetting item)
         {
+            object oldSetting;
+            if (_settingCache.TryGetValue(item.SettingKey, out oldSetting))
+            {
+                _settingCache.TryUpdate(item.SettingKey, item, oldSetting);
+            }
+            return base.Update(item);
+        }
+
+        public override void Remove(ApplicationSetting item)
+        {
+            object oldSetting;
+            _settingCache.TryRemove(item.SettingKey, out oldSetting);
+            base.Remove(item);
+        }
+        #region Serialize Settings
+
+        public T Get<T>() where T : class, new()
+        {
+
             return Get<T>(typeof(T).FullName);
         }
 
-        public T Get<T>(string key) where T : new()
+        public T Get<T>(string key) where T : class, new()
         {
-            var setting = Get(key);
-            if (setting == null)
-            {
-                setting = new ApplicationSetting { SettingKey = key, Value = JsonConvert.SerializeObject(new T()) };
-                Add(setting);
-            }
-            return JsonConvert.DeserializeObject<T>(setting.Value);
+            return _settingCache.GetOrAdd(key, k => _dataArchivedService.Get<T>(k, () => new T())) as T;
         }
 
-        public void Save<T>(T setting)
+        public void Save<T>(T setting) where T : class, new()
         {
             Save<T>(typeof(T).FullName, setting);
         }
 
-        public void Save<T>(string key, T setting)
+        public void Save<T>(string key, T setting) where T : class, new()
         {
-            var settingEntry = Get(key);
-            if (settingEntry == null)
+            object oldSetting;
+            if (_settingCache.TryGetValue(key, out oldSetting))
             {
-                settingEntry = new ApplicationSetting { SettingKey = key, Value = JsonConvert.SerializeObject(setting) };
-                Add(settingEntry);
+                _settingCache.TryUpdate(key, setting, oldSetting);
             }
-            else
-            {
-                settingEntry.Value = JsonConvert.SerializeObject(setting);
-                Update(settingEntry);
-            }
+            _dataArchivedService.Archive<T>(key, setting);
         }
+        #endregion
     }
 }

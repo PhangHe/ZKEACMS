@@ -9,10 +9,11 @@ using System.ComponentModel.DataAnnotations.Schema;
 using System.ComponentModel.DataAnnotations;
 using Easy.LINQ;
 using ZKEACMS.Extend;
+using Easy.RepositoryPattern;
 
 namespace ZKEACMS.Product.Models
 {
-    [Table("Product")]
+    [DataTable("Product")]
     public class ProductEntity : EditorEntity, IImage
     {
         public ProductEntity()
@@ -37,7 +38,7 @@ namespace ZKEACMS.Product.Models
         /// <summary>
         /// 类别
         /// </summary>
-        public int? ProductCategoryID { get; set; }
+        public int ProductCategoryID { get; set; }
 
         public string PartNumber { get; set; }
         /// <summary>
@@ -96,8 +97,8 @@ namespace ZKEACMS.Product.Models
             ViewConfig(m => m.ID).AsHidden();
             ViewConfig(m => m.TargetFrom).AsHidden();
             ViewConfig(m => m.TargetUrl).AsHidden();
-            ViewConfig(m => m.Url).AsHidden();
             ViewConfig(m => m.Title).AsTextBox().Required().Order(0).ShowInGrid().Search(Query.Operators.Contains);
+            ViewConfig(m => m.Url).AsTextBox().Order(1).MaxLength(100).UrlPart();
             ViewConfig(m => m.ImageUrl).AsTextBox().Required().MediaSelector();
             ViewConfig(m => m.ImageThumbUrl).AsTextBox().Required().MediaSelector();
             ViewConfig(m => m.PartNumber).AsTextBox().ShowInGrid().Search(Query.Operators.Contains);

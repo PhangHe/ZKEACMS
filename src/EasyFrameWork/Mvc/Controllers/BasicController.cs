@@ -26,15 +26,6 @@ namespace Easy.Mvc.Controllers
         {
             Service = service;
         }
-        protected void UpLoadImage(IImage entity)
-        {
-            if (entity == null) return;
-            if (!string.IsNullOrEmpty(entity.ImageUrl) && string.IsNullOrEmpty(entity.ImageThumbUrl))
-            {
-                entity.ImageThumbUrl = entity.ImageUrl;
-            }
-            string filePath = Request.SaveImage();
-        }
 
         public virtual IActionResult Index()
         {
@@ -52,7 +43,6 @@ namespace Easy.Mvc.Controllers
         {
             if (ModelState.IsValid)
             {
-                UpLoadImage(entity as IImage);
                 var result = Service.Add(entity);
                 if (result.HasViolation)
                 {
@@ -68,7 +58,15 @@ namespace Easy.Mvc.Controllers
         }
         public virtual IActionResult Edit(TPrimarykey Id)
         {
+            if (Id == null)
+            {
+                return NotFound();
+            }
             TEntity entity = Service.Get(Id);
+            if (entity == null)
+            {
+                return NotFound();
+            }
             return View(entity);
         }
 
@@ -83,7 +81,6 @@ namespace Easy.Mvc.Controllers
 
             if (ModelState.IsValid)
             {
-                UpLoadImage(entity as IImage);
                 var result = Service.Update(entity);
                 if (result.HasViolation)
                 {
@@ -103,9 +100,7 @@ namespace Easy.Mvc.Controllers
         {
             try
             {
-
                 Service.Remove(id);
-
                 return Json(new AjaxResult { Status = AjaxStatus.Normal });
             }
             catch (Exception ex)

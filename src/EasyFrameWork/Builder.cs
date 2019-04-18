@@ -1,5 +1,9 @@
-using CacheManager.Core;
+/* http://www.zkea.net/ 
+ * Copyright (c) ZKEASOFT. All rights reserved. 
+ * http://www.zkea.net/licenses */
+using Easy.Cache;
 using Easy.Encrypt;
+using Easy.Extend;
 using Easy.Logging;
 using Easy.MetaData;
 using Easy.Modules.DataDictionary;
@@ -10,6 +14,7 @@ using Easy.Modules.User.Service;
 using Easy.Mvc.Authorize;
 using Easy.Mvc.Plugin;
 using Easy.Mvc.RazorPages;
+using Easy.Mvc.StateProviders;
 using Easy.Mvc.ValueProvider;
 using Easy.Net;
 using Easy.Notification;
@@ -30,6 +35,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text.Encodings.Web;
 using System.Text.Unicode;
@@ -40,14 +46,14 @@ namespace Easy
     {
         public static void UseEasyFrameWork(this IServiceCollection services, IConfiguration configuration)
         {
-            services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<RazorViewEngineOptions>, PluginRazorViewEngineOptionsSetup>());
+            services.TryAddEnumerable(ServiceDescriptor.Singleton<IConfigureOptions<RazorViewEngineOptions>, PluginRazorViewEngineOptionsSetup>());
 
-            services.Replace(ServiceDescriptor.Transient<IControllerActivator, Mvc.Controllers.ServiceBasedControllerActivator>());
-            services.TryAddEnumerable(ServiceDescriptor.Transient<IActionDescriptorProvider, ActionDescriptorProvider>());
+            //services.Replace(ServiceDescriptor.Transient<IControllerActivator, Mvc.Controllers.ServiceBasedControllerActivator>());
+            //services.TryAddEnumerable(ServiceDescriptor.Transient<IActionDescriptorProvider, ActionDescriptorProvider>());
             services.TryAddSingleton<IPluginLoader, Loader>();
 
 
-            services.TryAddTransient<IAuthorizer, DefaultAuthorizer>();
+            services.TryAddScoped<IAuthorizer, DefaultAuthorizer>();
 
             services.TryAddTransient<ICookie, Cookie>();
             services.TryAddTransient<IUserService, UserService>();
@@ -55,9 +61,9 @@ namespace Easy
             services.TryAddTransient<IUserRoleRelationService, UserRoleRelationService>();
             services.TryAddTransient<IPermissionService, PermissionService>();
             services.TryAddTransient<IDataDictionaryService, DataDictionaryService>();
-            services.TryAddTransient<ILanguageService, LanguageService>();
+            services.AddScoped<ILanguageService, LanguageService>();
             services.TryAddTransient<IEncryptService, EncryptService>();
-            services.AddScoped<IOnModelCreating, EntityFrameWorkModelCreating>();
+            services.AddSingleton<IOnModelCreating, EntityFrameWorkModelCreating>();
 
             services.AddTransient<IViewRenderService, ViewRenderService>();
             services.AddTransient<INotificationManager, NotificationManager>();
@@ -72,18 +78,18 @@ namespace Easy
             services.AddTransient<IScriptExpressionEvaluator, ScriptExpressionEvaluator>();
             services.AddTransient<WebClient>();
 
-            services.AddSingleton(serviceProvider => CacheFactory.Build<ScriptExpressionResult>(setting =>
-            {
-                setting.WithDictionaryHandle("ScriptExpressionResult");
-            }));
+            services.AddSingleton<ICacheProvider, DefaultCacheProvider>();
+            services.AddTransient<ILocalize, Localize>();
 
-            services.AddSingleton(serviceProvider => CacheFactory.Build<LanguageEntity>(settings =>
-            {
-                settings.WithDictionaryHandle("Localization");
-            }));
+            services.ConfigureCache<ScriptExpressionResult>();
+            services.ConfigureCache<ConcurrentDictionary<string, ConcurrentDictionary<string, LanguageEntity>>>();
 
             services.AddSingleton<IAuthorizationHandler, RolePolicyRequirementHandler>();
-            services.AddSingleton(HtmlEncoder.Create(UnicodeRanges.All));
+            //services.AddSingleton(HtmlEncoder.Create(UnicodeRanges.All));
+
+            services.AddScoped<IApplicationContextStateProvider, CurrentCustomerStateProvider>();
+            services.AddScoped<IApplicationContextStateProvider, CurrentUserStateProvider>();
+            services.AddScoped<IApplicationContextStateProvider, HostingEnvironmentStateProvider>();
 
             services.ConfigureMetaData<UserEntity, UserMetaData>();
             services.ConfigureMetaData<DataDictionaryEntity, DataDictionaryEntityMetaData>();
@@ -98,14 +104,14 @@ namespace Easy
 
             services.AddDataProtection();
 
-            services.AddDbContext<EasyDbContext>();
+            //services.AddDbContext<EasyDbContext>();
         }
 
         public static void ConfigureMetaData<TEntity, TMetaData>(this IServiceCollection service)
             where TMetaData : ViewMetaData<TEntity>
             where TEntity : class
         {
-            service.AddTransient<ViewMetaData<TEntity>, TMetaData>();
+            service.AddSingleton<ViewMetaData<TEntity>, TMetaData>();
         }
 
         public static IEnumerable<IPluginStartup> LoadAvailablePlugins(this IServiceCollection services)

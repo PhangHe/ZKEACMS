@@ -9,11 +9,11 @@ using ZKEACMS.Page;
 using Easy;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
-using CacheManager.Core;
+using Easy.Cache;
 
 namespace ZKEACMS.Zone
 {
-    public class ZoneService : ServiceBase<ZoneEntity>, IZoneService
+    public class ZoneService : ServiceBase<ZoneEntity, CMSDbContext>, IZoneService
     {
         private readonly IServiceProvider _serviceProvder;
         private readonly ICacheManager<IEnumerable<ZoneEntity>> _cacheManager;
@@ -23,7 +23,7 @@ namespace ZKEACMS.Zone
             _serviceProvder = serviceProvder;
             _cacheManager = cacheManager;
         }
-        public override DbSet<ZoneEntity> CurrentDbSet => (DbContext as CMSDbContext).Zone;
+        public override DbSet<ZoneEntity> CurrentDbSet => DbContext.Zone;
         public override IQueryable<ZoneEntity> Get()
         {
             return CurrentDbSet.AsNoTracking();
@@ -42,32 +42,42 @@ namespace ZKEACMS.Zone
         }
         public IEnumerable<ZoneEntity> GetByPage(PageEntity page)
         {
-            Func<string, IEnumerable<ZoneEntity>> get = key =>
-             {
-                 IEnumerable<ZoneEntity> zones = Get().Where(m => m.PageId == page.ID).OrderBy(m => m.ID).ToList();
-                 if (!zones.Any())
-                 {
-                     zones = GetByLayoutId(page.LayoutId);
-                     if (ApplicationContext.IsAuthenticated)
-                     {
-                         foreach (var item in zones)
-                         {
-                             item.PageId = page.ID;
-                             Add(item);
-                         }
-                     }
-                 }
-                 return zones;
-             };
+            IEnumerable<ZoneEntity> get(string key, string region)
+            {
+                IEnumerable<ZoneEntity> zones = Get().Where(m => m.PageId == page.ID).OrderBy(m => m.ID).ToList();
+                if (!zones.Any())
+                {
+                    zones = GetByLayoutId(page.LayoutId);
+                    if (ApplicationContext.IsAuthenticated)
+                    {
+                        foreach (var item in zones)
+                        {
+                            item.PageId = page.ID;
+                            Add(item);
+                        }
+                    }
+                }
+                return zones;
+            }
             if (page.IsPublishedPage)
             {
-                return _cacheManager.GetOrAdd(page.ID, get);
+                return _cacheManager.GetOrAdd(page.ID, page.ReferencePageID, get);
             }
-            return get(page.ID);
+            return get(page.ID, page.ReferencePageID);
         }
         public IEnumerable<ZoneEntity> GetByLayoutId(string layoutId)
         {
             return Get().Where(m => m.LayoutId == layoutId && m.PageId == null).OrderBy(m => m.ID).ToList();
+        }
+
+        public void RemoveCache(string pageId)
+        {
+            _cacheManager.ClearRegion(pageId);
+        }
+
+        public void ClearCache()
+        {
+            _cacheManager.Clear();
         }
     }
 }

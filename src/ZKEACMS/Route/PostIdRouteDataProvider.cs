@@ -1,4 +1,4 @@
-﻿/*!
+/*!
  * http://www.zkea.net/
  * Copyright 2018 ZKEASOFT
  * 深圳市纸壳软件有限公司
@@ -14,6 +14,8 @@ namespace ZKEACMS.Route
 {
     public class PostIdRouteDataProvider : IRouteDataProvider
     {
+        public int Order { get { return 1; } }
+
         public string ExtractVirtualPath(string path, RouteValueDictionary values)
         {
             if (CustomRegex.PostIdRegex.IsMatch(path))
@@ -24,9 +26,9 @@ namespace ZKEACMS.Route
                     int.TryParse(evaluator.Groups[1].Value, out postId);
                     return string.Empty;
                 });
-                if (postId > 0 && !values.ContainsKey(StringKeys.RouteValue_Post))
+                if (postId > 0)
                 {
-                    values.Add(StringKeys.RouteValue_Post, postId);
+                    values.SetPost(postId);
                 }
             }
             return path;

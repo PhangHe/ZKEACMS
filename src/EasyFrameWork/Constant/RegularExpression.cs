@@ -7,7 +7,7 @@ namespace Easy.Constant
         /// <summary>
         /// 邮件
         /// </summary>
-        public const string Email = @"\w+([-+.]\w+)*@\w+([-.]\w+)*\.\w+([-.]\w+)*";
+        public const string Email = @"^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$";
         /// <summary>
         /// 网址
         /// </summary>
@@ -43,11 +43,11 @@ namespace Easy.Constant
         /// <summary>
         /// 匹配正整数
         /// </summary>
-        public const string PositiveIntegers = @"^[1-9]+$";
+        public const string PositiveIntegers = @"^[1-9]\d*$";
         /// <summary>
         /// 匹配负整数
         /// </summary>
-        public const string NegativeIntegers = @"^-[1-9]+$";
+        public const string NegativeIntegers = @"^-[1-9]\d*$";
         /// <summary>
         ///匹配整数
         /// </summary>
